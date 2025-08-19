@@ -69,11 +69,11 @@ const FavoritesList = ({ favorites, fetchWeather, removeFavorite }) => (
 function App() {
   const [city, setCity] = useState('');
   const [weatherData, setWeatherData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedDayData, setSelectedDayData] = useState(null);
-  // New state to store search results from Nominatim
   const [searchResults, setSearchResults] = useState([]);
 
   const [favorites, setFavorites] = useState(() => {
@@ -123,13 +123,12 @@ function App() {
     return () => clearInterval(intervalId);
   }, []); 
 
-  // New function to fetch weather data by latitude and longitude
   const fetchWeatherByCoords = async (lat, lon) => {
-    setLoading(true);
+    setWeatherLoading(true);
     setError(null);
     setWeatherData(null);
     setSelectedDayData(null);
-    setSearchResults([]); // Clear search results after selection
+    setSearchResults([]);
 
     try {
       const response = await fetch(`${WEATHER_API_BASE_URL}/forecast.json?key=${API_KEY}&q=${lat},${lon}&days=3&lang=ja`);
@@ -143,18 +142,17 @@ function App() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setWeatherLoading(false);
     }
   };
 
-  // Modified search handler to first use Nominatim API
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!city) {
       setError('都市名を入力してください');
       return;
     }
-    setLoading(true);
+    setSearchLoading(true);
     setError(null);
     setWeatherData(null);
     setSearchResults([]);
@@ -165,25 +163,19 @@ function App() {
         throw new Error('検索中にエラーが発生しました。');
       }
       const data = await response.json();
-      // Filter results to only show cities, towns, and villages
       const filteredResults = data.filter(result => 
-        result.addresstype == "city" || result.addresstype == "town" || result.addresstype == "village"
+        result.address?.city || result.address?.town || result.address?.village
       );
 
       if (filteredResults.length === 0) {
         setError('見つかりませんでした。より正確な都市名で検索してください。');
-      } else if (filteredResults.length === 1) {
-        // If only one result, directly fetch weather
-        const result = filteredResults[0];
-        fetchWeatherByCoords(result.lat, result.lon);
       } else {
-        // Otherwise, show the list of options to the user
         setSearchResults(filteredResults);
       }
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
   };
 
@@ -227,12 +219,134 @@ function App() {
     setSearchResults([]);
   };
   
+  // Conditionally render the main content based on the state
+  const renderContent = () => {
+    if (error) {
+      return <p className="text-center text-red-300 font-semibold mt-6">{error}</p>;
+    }
+    
+    if (weatherLoading) {
+      return (
+        <div className="flex justify-center items-center h-72">
+          <div className="w-16 h-16 rounded-full border-8 border-t-8 border-gray-200 border-t-teal-400 animate-spin"></div>
+        </div>
+      );
+    }
+    if (searchLoading) {
+      return (
+        <div className="flex justify-center items-center h-72">
+          <div className="w-16 h-16 rounded-full border-8 border-t-8 border-gray-200 border-t-teal-400 animate-spin"></div>
+        </div>
+      );
+    }
+
+    if (weatherData) {
+      return (
+        <div className="h-full overflow-y-auto pb-4">
+          <button
+            onClick={backToFavorites}
+            className="mb-4 text-white text-opacity-80 hover:text-white transition duration-200 flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            お気に入りリストに戻る
+          </button>
+          
+          <div>
+            {selectedDayData && (
+              <div className="p-6 bg-white bg-opacity-10 backdrop-filter backdrop-blur-md rounded-xl shadow-lg border border-white border-opacity-20 text-center md:p-8">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="text-left">
+                    <h2 className="text-2xl sm:text-3xl font-semibold text-white text-opacity-90">{weatherData.location.name}</h2>
+                    <p className="text-sm text-gray-300">{weatherData.location.country}</p>
+                  </div>
+                  <button
+                    onClick={addFavorite}
+                    className={`p-2 rounded-full transition duration-200 ${isFavorite ? 'bg-gray-400 cursor-not-allowed' : 'bg-yellow-300 hover:bg-yellow-400'}`}
+                    title={isFavorite ? 'お気に入り登録済み' : 'お気に入りに追加'}
+                    disabled={isFavorite}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex justify-center items-center my-4">
+                  <img src={selectedDayData.condition.icon} alt="weather icon" className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-lg" />
+                  <p className="text-6xl sm:text-7xl font-bold mt-2 sm:mt-0 sm:ml-6 text-white drop-shadow-lg">{selectedDayData.temp_c}°C</p>
+                </div>
+                <p className="text-lg text-white text-opacity-80 font-medium">{selectedDayData.condition.text}</p>
+                <div className="grid grid-cols-2 gap-4 mt-6 text-left">
+                  <div>
+                    <p className="text-gray-300">湿度</p>
+                    <p className="text-lg font-medium text-white">{selectedDayData.humidity}%</p>
+                  </div>
+                  <div>
+                    <p className="text-300">風速</p>
+                    <p className="text-lg font-medium text-white">{kphToMs(selectedDayData.wind_kph)} m/s</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-300">体感温度</p>
+                    <p className="text-lg font-medium text-white">{selectedDayData.feelslike_c}°C</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-300">降水量</p>
+                    <p className="text-lg font-medium text-white">{selectedDayData.precip_mm} mm</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="mt-8">
+              <h3 className="text-2xl font-bold mb-4 text-center text-white text-opacity-80">3日間の予報</h3>
+              <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-transparent">
+                {weatherData.forecast.forecastday.map((day) => (
+                  <div key={day.date_epoch} className="relative z-10">
+                    <ForecastDay day={day} onSelect={handleDaySelect} isSelected={selectedDayData?.condition.icon === day.day.condition.icon} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (searchResults.length > 0) {
+      return (
+        <div className="h-72 overflow-y-auto">
+          <h3 className="text-xl font-bold mb-4 text-center text-white text-opacity-80">検索結果を選択してください</h3>
+          <ul className="space-y-2">
+            {searchResults.map((result) => (
+              <li 
+                key={result.place_id} 
+                className="bg-white bg-opacity-10 p-4 rounded-lg cursor-pointer hover:bg-opacity-20 transition duration-200"
+                onClick={() => {
+                  setSearchResults([]); // Hide search results list
+                  fetchWeatherByCoords(result.lat, result.lon);
+                }}
+              >
+                <p className="font-semibold text-white">{result.display_name}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-72 overflow-y-auto">
+        <FavoritesList favorites={favorites} fetchWeather={fetchWeatherByCoords} removeFavorite={removeFavorite} />
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 text-white flex flex-col items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl xl:max-w-6xl bg-white bg-opacity-5 backdrop-filter backdrop-blur-lg rounded-2xl shadow-2xl p-6 md:p-8 border border-white border-opacity-20">
+      <div className="w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl xl:max-w-6xl bg-white bg-opacity-5 backdrop-filter backdrop-blur-lg rounded-2xl shadow-2xl p-6 md:p-8 border border-white border-opacity-20 relative">
         
         {/* Search Bar section */}
-        <div className={`transition-opacity duration-500 ease-in-out ${weatherData ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'}`}>
+        <div className={`transition-all duration-500 ease-in-out ${weatherData ? 'h-0 opacity-0 overflow-hidden' : 'h-auto opacity-100'}`}>
           <h1 className="text-3xl sm:text-4xl font-extrabold mb-6 text-center text-white text-opacity-90 drop-shadow-lg">Meteo</h1>
           <div className="flex flex-col sm:flex-row mb-4 items-center">
             <form onSubmit={handleSearch} className="flex-grow flex w-full">
@@ -242,118 +356,22 @@ function App() {
                 placeholder="都市名を入力してください"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
+                disabled={searchLoading || weatherLoading}
               />
               <button
                 type="submit"
                 className="p-3 bg-teal-400 hover:bg-teal-500 rounded-r-lg transition duration-200 font-medium text-white"
+                disabled={searchLoading || weatherLoading}
               >
-                検索
+                {searchLoading ? '検索中...' : '検索'}
               </button>
             </form>
           </div>
         </div>
 
-        {loading && <p className="text-center text-gray-300 mt-6">読み込み中...</p>}
-        {error && <p className="text-center text-red-300 font-semibold mt-6">{error}</p>}
-
-        {/* Favorites list / Search results / Detailed view */}
-        <div className="mt-6">
-          {/* Show favorites list when no search results or weather data */}
-          <div className={`transition-all duration-500 ease-in-out ${weatherData || searchResults.length > 0 ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'}`}>
-            <FavoritesList favorites={favorites} fetchWeather={fetchWeatherByCoords} removeFavorite={removeFavorite} />
-          </div>
-
-          {/* Show search results list */}
-          <div className={`transition-all duration-500 ease-in-out ${searchResults.length > 0 ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden'}`}>
-            {searchResults.length > 0 && (
-              <div>
-                <h3 className="text-xl font-bold mb-4 text-center text-white text-opacity-80">検索結果を選択してください</h3>
-                <ul className="space-y-2">
-                  {searchResults.map((result) => (
-                    <li 
-                      key={result.place_id} 
-                      className="bg-white bg-opacity-10 p-4 rounded-lg cursor-pointer hover:bg-opacity-20 transition duration-200"
-                      onClick={() => fetchWeatherByCoords(result.lat, result.lon)}
-                    >
-                      <p className="font-semibold text-white">{result.display_name}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Show weather details */}
-          <div className={`transition-all duration-500 ease-in-out ${weatherData ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden'}`}>
-            {weatherData && (
-              <div>
-                <button
-                  onClick={backToFavorites}
-                  className="mb-4 text-white text-opacity-80 hover:text-white transition duration-200 flex items-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  お気に入りリストに戻る
-                </button>
-
-                {selectedDayData && (
-                  <div className="p-6 bg-white bg-opacity-10 backdrop-filter backdrop-blur-md rounded-xl shadow-lg border border-white border-opacity-20 text-center md:p-8">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="text-left">
-                        <h2 className="text-2xl sm:text-3xl font-semibold text-white text-opacity-90">{weatherData.location.name}</h2>
-                        <p className="text-sm text-gray-300">{weatherData.location.country}</p>
-                      </div>
-                      <button
-                        onClick={addFavorite}
-                        className={`p-2 rounded-full transition duration-200 ${isFavorite ? 'bg-gray-400 cursor-not-allowed' : 'bg-yellow-300 hover:bg-yellow-400'}`}
-                        title={isFavorite ? 'お気に入り登録済み' : 'お気に入りに追加'}
-                        disabled={isFavorite}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="flex justify-center items-center my-4">
-                      <img src={selectedDayData.condition.icon} alt="weather icon" className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-lg" />
-                      <p className="text-6xl sm:text-7xl font-bold mt-2 sm:mt-0 sm:ml-6 text-white drop-shadow-lg">{selectedDayData.temp_c}°C</p>
-                    </div>
-                    <p className="text-lg text-white text-opacity-80 font-medium">{selectedDayData.condition.text}</p>
-                    <div className="grid grid-cols-2 gap-4 mt-6 text-left">
-                      <div>
-                        <p className="text-gray-300">湿度</p>
-                        <p className="text-lg font-medium text-white">{selectedDayData.humidity}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-300">風速</p>
-                        <p className="text-lg font-medium text-white">{kphToMs(selectedDayData.wind_kph)} m/s</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-300">体感温度</p>
-                        <p className="text-lg font-medium text-white">{selectedDayData.feelslike_c}°C</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-300">降水量</p>
-                        <p className="text-lg font-medium text-white">{selectedDayData.precip_mm} mm</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-8">
-                  <h3 className="text-2xl font-bold mb-4 text-center text-white text-opacity-80">3日間の予報</h3>
-                  <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-transparent">
-                    {weatherData.forecast.forecastday.map((day) => (
-                      <div key={day.date_epoch} className="relative z-10">
-                        <ForecastDay day={day} onSelect={handleDaySelect} isSelected={selectedDayData?.condition.icon === day.day.condition.icon} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* Dynamic content section */}
+        <div className={`mt-6 ${(weatherLoading || searchLoading) ? 'opacity-25' : ''}`}>
+          {renderContent()}
         </div>
       </div>
     </div>
