@@ -14,7 +14,7 @@ const ForecastDay = ({ day, onSelect, isSelected }) => {
   const date = new Date(day.date);
   const dayName = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
   
-  const cardClasses = `flex flex-col items-center bg-white bg-opacity-10 backdrop-filter backdrop-blur-md border border-gray-300 border-opacity-20 p-4 rounded-lg shadow-md flex-shrink-0 w-32 sm:w-40 md:w-48 transition-transform duration-300 cursor-pointer ${isSelected ? 'border-2 border-teal-400' : ''}`;
+  const cardClasses = `flex flex-col items-center bg-white bg-opacity-10 backdrop-filter backdrop-blur-md border border-gray-300 border-opacity-20 p-4 rounded-lg shadow-md flex-shrink-0 w-36 w-min-36 sm:w-40 md:w-48 transition-transform duration-300 cursor-pointer ${isSelected ? 'border-2 border-teal-400' : ''}`;
   
   return (
     <div className={cardClasses} onClick={() => onSelect(day)}>
@@ -164,7 +164,7 @@ function App() {
       }
       const data = await response.json();
       const filteredResults = data.filter(result => 
-        result.address?.city || result.address?.town || result.address?.village
+        result.addresstype == "city" || result.addresstype == "town" || result.addresstype == "village"
       );
 
       if (filteredResults.length === 0) {
