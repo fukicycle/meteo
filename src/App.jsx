@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 
 // Replace 'YOUR_API_KEY' with your actual WeatherAPI key
 const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
-const WEATHER_API_BASE_URL = 'http://api.weatherapi.com/v1';
+const WEATHER_API_BASE_URL = 'https://api.weatherapi.com/v1';
 const NOMINATIM_API_URL = 'https://nominatim.openstreetmap.org/search';
 
 // Function to convert KPH to M/S
