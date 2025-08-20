@@ -39,7 +39,7 @@ const FavoritesList = ({ favorites, fetchWeather, removeFavorite }) => (
           <div 
             key={favCity.name} 
             className="flex items-center justify-between bg-white bg-opacity-10 backdrop-filter backdrop-blur-md rounded-lg p-4 shadow-md cursor-pointer transition duration-200 hover:bg-opacity-20"
-            onClick={() => fetchWeather(favCity.name)}
+            onClick={() => fetchWeather(favCity.lat, favCity.lon)}
           >
             <div className="flex items-center">
               <img src={favCity.icon} alt="weather icon" className="w-8 h-8 mr-2" />
@@ -86,19 +86,21 @@ function App() {
     }
   });
 
-  const fetchFavoriteWeather = async (cityName) => {
+  const fetchFavoriteWeather = async (lat, lon) => {
     try {
-      const response = await fetch(`${WEATHER_API_BASE_URL}/current.json?key=${API_KEY}&q=${cityName}&lang=ja`);
+      const response = await fetch(`${WEATHER_API_BASE_URL}/current.json?key=${API_KEY}&q=${lat},${lon}&lang=ja`);
       if (response.ok) {
         const data = await response.json();
         return {
           name: data.location.name,
           temp: data.current.temp_c,
-          icon: data.current.condition.icon
+          icon: data.current.condition.icon,
+          lat: data.location.lat,
+          lon: data.location.lon
         };
       }
     } catch (e) {
-      console.error(`Failed to fetch weather for ${cityName}`, e);
+      console.error(`Failed to fetch weather for ${lat}, ${lon}`, e);
     }
     return null;
   };
@@ -106,7 +108,7 @@ function App() {
   const updateAllFavoriteWeather = async () => {
     const updatedFavorites = await Promise.all(
       favorites.map(async (fav) => {
-        const newFavData = await fetchFavoriteWeather(fav.name);
+        const newFavData = await fetchFavoriteWeather(fav.lat,fav.lon);
         return newFavData || fav;
       })
     );
@@ -184,7 +186,9 @@ function App() {
       const newFavorite = {
         name: weatherData.location.name,
         temp: weatherData.current.temp_c,
-        icon: weatherData.current.condition.icon
+        icon: weatherData.current.condition.icon,
+        lat: weatherData.location.lat,
+        lon: weatherData.location.lon
       };
       const newFavorites = [...favorites, newFavorite];
       setFavorites(newFavorites);
